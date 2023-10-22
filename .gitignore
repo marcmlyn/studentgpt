@@ -1,2 +1,4 @@
 secrets.json
 studentgpt.code-workspace
+*.md
+~README.md
