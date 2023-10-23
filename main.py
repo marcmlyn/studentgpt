@@ -1,11 +1,12 @@
 import json
 import openai
-import time
+from retry import retry_with_exponential_backoff
 
 
 DRY_RUN = False
 
-MODEL = "gpt-3.5-turbo-16k" # "gpt-4"
+# MODEL = "gpt-3.5-turbo-16k" 
+MODEL = "gpt-4"
 
 DEFAULT_SYSTEM_MESSAGE = (
 """
@@ -32,33 +33,32 @@ def write_line_to_file(content, filename='odpowiedzi.md'):
         f.write(content + '\n')
 
 
+@retry_with_exponential_backoff
+def chatcompletions_with_backoff(**kwargs):
+    return openai.ChatCompletion.create(**kwargs)
+
+
 def get_answers(question, how_many=1, system_message=DEFAULT_SYSTEM_MESSAGE, dry_run=DRY_RUN, model=MODEL):
-    try:
-        response = "Odp..." if dry_run else openai.ChatCompletion.create(
-            model=model,
-            messages=[
-                {
-                "role": "system",
-                "content": system_message
-                },
-                {
-                "role": "user",
-                "content": question
-                }
-            ],
-            temperature=0.5,
-            max_tokens=9128,
-            top_p=1,
-            n=how_many,
-            frequency_penalty=0,
-            presence_penalty=0
-        )
-        return ( answer.message.content for answer in response.choices )
-    except openai.error.RateLimitError as e:
-        wait_time = 15
-        print(f"Rate limit exceeded. Waiting {wait_time} seconds before retrying...")
-        time.sleep(wait_time)
-        return get_answers(question, how_many, system_message, dry_run)
+    response = "Odp..." if dry_run else chatcompletions_with_backoff(
+        model=model,
+        messages=[
+            {
+            "role": "system",
+            "content": system_message
+            },
+            {
+            "role": "user",
+            "content": question
+            }
+        ],
+        temperature=0.5,
+        max_tokens=9128,
+        top_p=1,
+        n=how_many,
+        frequency_penalty=0,
+        presence_penalty=0
+    )
+    return ( answer.message.content for answer in response.choices )
 
 
 def main():
